@@ -61,7 +61,7 @@ def generate_base_candles(n=20):
 
 def generate_hammer():
     df = generate_base_candles()
-    idx = -3  # Pattern at end
+    idx = -3
     body = abs(df.iloc[idx]['open'] - df.iloc[idx]['close'])
     wick_size = body * random.uniform(2.5, 4)
     df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - wick_size
@@ -91,13 +91,13 @@ def generate_engulfing(bias):
     idx = -3
     
     if bias == "bullish":
-        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] - 0.5  # Red candle
+        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] - 0.5
         df.at[df.index[idx], 'open'] = df.iloc[idx-1]['close'] - 0.3
-        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] + 1.5  # Green engulfs
+        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] + 1.5
     else:
-        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] + 0.5  # Green candle
+        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] + 0.5
         df.at[df.index[idx], 'open'] = df.iloc[idx-1]['close'] + 0.3
-        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] - 1.5  # Red engulfs
+        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] - 1.5
         
     df.at[df.index[idx], 'high'] = max(df.iloc[idx]['open'], df.iloc[idx]['close']) + 0.2
     df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - 0.2
@@ -110,18 +110,19 @@ def generate_engulfing(bias):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def initialize_session():
+    """FIXED - removed stray apostrophes"""
     if 'score' not in st.session_state:
         st.session_state.score = 0
         st.session_state.streak = 0
-        st.session_state.account' = 10000
+        st.session_state.account = 10000
         st.session_state.phase = 1
         st.session_state.total_trades = 0
         st.session_state.winning_trades = 0
-        st.session_state.current_chart' = None
-        st.session_state.correct_pattern' = None
-        st.session_state.start_time' = None
-        st.session_state.game_active' = False
-        st.session_state.time_limit' = 15
+        st.session_state.current_chart = None
+        st.session_state.correct_pattern = None
+        st.session_state.start_time = None
+        st.session_state.game_active = False
+        st.session_state.time_limit = 15
 
 def draw_chart(df):
     fig = go.Figure(data=go.Candlestick(
@@ -148,7 +149,6 @@ def draw_chart(df):
         plot_bgcolor='#16213e'
     )
     
-    # Highlight last 3 candles (where pattern appears)
     last_date = df['date'].iloc[-3]
     fig.add_vrect(
         x0=last_date, x1=df['date'].iloc[-1],
@@ -165,7 +165,7 @@ def calculate_score(pattern_correct, time_remaining, risk_ratio, sl_correct):
     base = 100
     pattern_mult = 1.0 if pattern_correct else 0
     time_bonus = 0.1 * time_remaining
-    risk_mult = min(risk_ratio * 0.5, 2.0)  # 1:2 R:R = 1.0, 1:3 = 1.5
+    risk_mult = min(risk_ratio * 0.5, 2.0)
     sl_mult = 1.0 if sl_correct else 0.7
     
     return int(base * pattern_mult * (1 + time_bonus/10) * risk_mult * sl_mult)
@@ -173,7 +173,6 @@ def calculate_score(pattern_correct, time_remaining, risk_ratio, sl_correct):
 def main():
     st.set_page_config(page_title="Pattern Sensei", layout="wide", initial_sidebar_state="collapsed")
     
-    # Arcade-style CSS
     st.markdown("""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');
@@ -207,7 +206,6 @@ def main():
     
     initialize_session()
     
-    # Header
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
         st.markdown(f'<div class="scoreboard">💰 ACCOUNT<br>${st.session_state.account:,.2f}</div>', unsafe_allow_html=True)
@@ -216,13 +214,10 @@ def main():
     with col3:
         st.markdown(f'<div class="scoreboard">⚡ SCORE<br>{st.session_state.score}</div>', unsafe_allow_html=True)
     
-    # Phase indicator
     st.markdown(f"<h3 style='text-align: center; color: #48dbfb;'>Phase {st.session_state.phase} - {['Initiate', 'Apprentice', 'Journeyman'][st.session_state.phase-1].upper()}</h3>", unsafe_allow_html=True)
     
-    # Game area
     if not st.session_state.game_active:
         if st.button("🎯 START TRADE", key="start"):
-            # Generate new chart
             pattern_name = random.choice(list(PATTERNS.keys()))
             df, pattern = PATTERNS[pattern_name]['generator']()
             
@@ -233,33 +228,29 @@ def main():
             st.rerun()
     
     else:
-        # Show timer
         elapsed = time.time() - st.session_state.start_time
         remaining = max(0, st.session_state.time_limit - elapsed)
         
         if remaining > 0:
             st.markdown(f'<div class="timer">{remaining:.1f}s</div>', unsafe_allow_html=True)
             
-            # Draw chart
             fig = draw_chart(st.session_state.current_chart)
             st.plotly_chart(fig, use_container_width=True, key="chart")
             
-            # Pattern selection
             st.markdown("### 🎯 SELECT PATTERN")
             cols = st.columns(3)
             pattern_options = list(PATTERNS.keys())
             for i, pattern in enumerate(pattern_options):
                 with cols[i % 3]:
                     if st.button(pattern, key=f"pat_{pattern}"):
-                        handle_submission(pattern, remaining)
+                        # Simple submission handler
+                        st.session_state.selected_pattern = pattern
+                        st.rerun()
             
-            # Risk management controls
-            st.markdown("### ⚔️ RISK MANAGEMENT")
-            col_r1, col_r2 = st.columns(2)
-            with col_r1:
-                risk_ratio = st.slider("Risk:Reward Ratio", 1.0, 3.0, 1.5, 0.1)
-            with col_r2:
-                sl_placement = st.radio("Stop Loss Placement", ["Correct", "Too Tight", "Too Loose"])
+            # Handle submission after rerun
+            if 'selected_pattern' in st.session_state:
+                handle_submission(st.session_state.selected_pattern, remaining)
+                del st.session_state.selected_pattern
             
         else:
             st.error("⏰ TIME'S UP! Pattern was: " + st.session_state.correct_pattern)
@@ -276,11 +267,9 @@ def handle_submission(selected_pattern, time_remaining):
         st.session_state.winning_trades += 1
         st.session_state.streak += 1
         
-        # Calculate score (simplified for Phase 1)
         points = calculate_score(True, time_remaining, 1.5, True)
         st.session_state.score += points
         
-        # Update account (2% risk, 1:2 R:R)
         profit = st.session_state.account * 0.02 * 2
         st.session_state.account += profit
         

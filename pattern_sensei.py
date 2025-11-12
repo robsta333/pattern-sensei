@@ -1,177 +1,5 @@
-import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-from datetime import datetime, timedelta
-import time
-import random
-
-# ─────────────────────────────────────────────────────────────────────────────
-# PATTERN DEFINITIONS & GENERATION
-# ─────────────────────────────────────────────────────────────────────────────
-
-PATTERNS = {
-    "Hammer": {
-        "desc": "Small body, long lower wick (2x+ body), bullish",
-        "bias": "Bullish",
-        "stop_loss": "Below wick low",
-        "generator": lambda: generate_hammer()
-    },
-    "Shooting Star": {
-        "desc": "Small body, long upper wick (2x+ body), bearish",
-        "bias": "Bearish", 
-        "stop_loss": "Above wick high",
-        "generator": lambda: generate_shooting_star()
-    },
-    "Doji": {
-        "desc": "Open ≈ Close, indecision",
-        "bias": "Neutral",
-        "stop_loss": "Beyond wicks",
-        "generator": lambda: generate_doji()
-    },
-    "Bullish Engulfing": {
-        "desc": "Small red candle fully covered by large green candle",
-        "bias": "Bullish",
-        "stop_loss": "Below green candle low",
-        "generator": lambda: generate_engulfing("bullish")
-    },
-    "Bearish Engulfing": {
-        "desc": "Small green candle fully covered by large red candle", 
-        "bias": "Bearish",
-        "stop_loss": "Above red candle high",
-        "generator": lambda: generate_engulfing("bearish")
-    }
-}
-
-def generate_base_candles(n=20):
-    """Generate realistic OHLCV data"""
-    np.random.seed(int(time.time()) + random.randint(0, 1000))
-    start_price = random.uniform(50, 150)
-    volatility = random.uniform(0.01, 0.03)
-    
-    df = pd.DataFrame()
-    df['open'] = [start_price + np.random.normal(0, volatility*start_price) for _ in range(n)]
-    df['close'] = df['open'] + np.random.normal(0, volatility*start_price*0.5, n)
-    df['high'] = df[['open', 'close']].max(axis=1) + np.random.uniform(0, volatility*start_price*0.8, n)
-    df['low'] = df[['open', 'close']].min(axis=1) - np.random.uniform(0, volatility*start_price*0.8, n)
-    df['volume'] = np.random.randint(100000, 1000000, n)
-    df['date'] = [datetime.now() - timedelta(minutes=5*i) for i in range(n)][::-1]
-    
-    return df
-
-def generate_hammer():
-    df = generate_base_candles()
-    idx = -3
-    body = abs(df.iloc[idx]['open'] - df.iloc[idx]['close'])
-    wick_size = body * random.uniform(2.5, 4)
-    df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - wick_size
-    df.at[df.index[idx], 'high'] = max(df.iloc[idx]['open'], df.iloc[idx]['close']) + body*0.3
-    return df, "Hammer"
-
-def generate_shooting_star():
-    df = generate_base_candles()
-    idx = -3
-    body = abs(df.iloc[idx]['open'] - df.iloc[idx]['close'])
-    wick_size = body * random.uniform(2.5, 4)
-    df.at[df.index[idx], 'high'] = max(df.iloc[idx]['open'], df.iloc[idx]['close']) + wick_size
-    df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - body*0.3
-    return df, "Shooting Star"
-
-def generate_doji():
-    df = generate_base_candles()
-    idx = -3
-    body_range = df.iloc[idx]['open'] * 0.002
-    df.at[df.index[idx], 'close'] = df.iloc[idx]['open'] + random.uniform(-body_range, body_range)
-    df.at[df.index[idx], 'high'] = df.iloc[idx]['open'] + df.iloc[idx]['open']*0.01
-    df.at[df.index[idx], 'low'] = df.iloc[idx]['open'] - df.iloc[idx]['open']*0.01
-    return df, "Doji"
-
-def generate_engulfing(bias):
-    df = generate_base_candles()
-    idx = -3
-    
-    if bias == "bullish":
-        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] - 0.5
-        df.at[df.index[idx], 'open'] = df.iloc[idx-1]['close'] - 0.3
-        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] + 1.5
-    else:
-        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] + 0.5
-        df.at[df.index[idx], 'open'] = df.iloc[idx-1]['close'] + 0.3
-        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] - 1.5
-        
-    df.at[df.index[idx], 'high'] = max(df.iloc[idx]['open'], df.iloc[idx]['close']) + 0.2
-    df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - 0.2
-    
-    pattern = "Bullish Engulfing" if bias == "bullish" else "Bearish Engulfing"
-    return df, pattern
-
-# ─────────────────────────────────────────────────────────────────────────────
-# STREAMLIT UI & GAME LOGIC
-# ─────────────────────────────────────────────────────────────────────────────
-
-def initialize_session():
-    """FIXED - removed stray apostrophes"""
-    if 'score' not in st.session_state:
-        st.session_state.score = 0
-        st.session_state.streak = 0
-        st.session_state.account = 10000
-        st.session_state.phase = 1
-        st.session_state.total_trades = 0
-        st.session_state.winning_trades = 0
-        st.session_state.current_chart = None
-        st.session_state.correct_pattern = None
-        st.session_state.start_time = None
-        st.session_state.game_active = False
-        st.session_state.time_limit = 15
-
-def draw_chart(df):
-    fig = go.Figure(data=go.Candlestick(
-        x=df['date'],
-        open=df['open'],
-        high=df['high'],
-        low=df['low'],
-        close=df['close'],
-        increasing_line_color='#26d367',
-        decreasing_line_color='#ff4757',
-        increasing_fillcolor='#26d367',
-        decreasing_fillcolor='#ff4757'
-    ))
-    
-    fig.update_layout(
-        title="CHART ACTION - IDENTIFY THE PATTERN",
-        title_font_color="#ff6b6b",
-        title_font_size=24,
-        xaxis_rangeslider_visible=False,
-        template='plotly_dark',
-        height=500,
-        margin=dict(l=20, r=20, t=60, b=20),
-        paper_bgcolor='#1a1a2e',
-        plot_bgcolor='#16213e'
-    )
-    
-    last_date = df['date'].iloc[-3]
-    fig.add_vrect(
-        x0=last_date, x1=df['date'].iloc[-1],
-        fillcolor="rgba(255,107,107,0.1)",
-        layer="below",
-        line_width=0,
-        annotation_text="FOCUS ZONE",
-        annotation_position="top left"
-    )
-    
-    return fig
-
-def calculate_score(pattern_correct, time_remaining, risk_ratio, sl_correct):
-    base = 100
-    pattern_mult = 1.0 if pattern_correct else 0
-    time_bonus = 0.1 * time_remaining
-    risk_mult = min(risk_ratio * 0.5, 2.0)
-    sl_mult = 1.0 if sl_correct else 0.7
-    
-    return int(base * pattern_mult * (1 + time_bonus/10) * risk_mult * sl_mult)
-
 def main():
-    st.set_page_config(page_title="Pattern Sensei", layout="wide", initial_sidebar_state="collapsed")
+    st.set_page_config(page_title="Pattern Sensei", layout="wide", initial_sidebar_state="expanded")
     
     st.markdown("""
     <style>
@@ -201,11 +29,72 @@ def main():
         font-weight: bold;
         text-align: center;
     }
+    .cheat-sheet-chart {
+        height: 150px !important;
+    }
     </style>
     """, unsafe_allow_html=True)
     
     initialize_session()
     
+    # ──────────────────────────────────────────────────────────────
+    # COLLAPSIBLE CHEAT SHEET IN SIDEBAR
+    # ──────────────────────────────────────────────────────────────
+    with st.sidebar:
+        st.markdown("## 📖 PATTERN CHEAT SHEET")
+        with st.expander("CLICK TO EXPAND (AVAILABLE DURING GAME)", expanded=False):
+            st.markdown("### Master These 5 Patterns")
+            
+            for pattern_name in PATTERNS.keys():
+                st.markdown(f"---")
+                st.markdown(f"#### **{pattern_name.upper()}**")
+                
+                # Generate perfect example
+                if pattern_name == "Hammer":
+                    example_df = create_perfect_hammer()
+                elif pattern_name == "Shooting Star":
+                    example_df = create_perfect_shooting_star()
+                elif pattern_name == "Doji":
+                    example_df = create_perfect_doji()
+                elif pattern_name == "Bullish Engulfing":
+                    example_df = create_perfect_engulfing("bullish")
+                elif pattern_name == "Bearish Engulfing":
+                    example_df = create_perfect_engulfing("bearish")
+                
+                # Mini chart
+                fig = go.Figure(data=go.Candlestick(
+                    x=example_df['date'],
+                    open=example_df['open'],
+                    high=example_df['high'],
+                    low=example_df['low'],
+                    close=example_df['close'],
+                    increasing_line_color='#26d367',
+                    decreasing_line_color='#ff4757'
+                ))
+                
+                fig.update_layout(
+                    height=120,
+                    margin=dict(l=10, r=10, t=10, b=10),
+                    xaxis_visible=False,
+                    yaxis_visible=False,
+                    template='plotly_dark',
+                    paper_bgcolor='#1a1a2e',
+                    plot_bgcolor='#16213e'
+                )
+                
+                st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+                
+                # Key points
+                st.markdown(f"""
+                **Visual:** {PATTERNS[pattern_name]['desc']}  
+                **Bias:** {PATTERNS[pattern_name]['bias']}  
+                **Stop:** {PATTERNS[pattern_name]['stop_loss']}  
+                **⏱️ ID Time:** {['5 sec', '5 sec', '7 sec', '6 sec', '6 sec'][list(PATTERNS.keys()).index(pattern_name)]}
+                """)
+    
+    # ──────────────────────────────────────────────────────────────
+    # MAIN GAME UI (unchanged)
+    # ──────────────────────────────────────────────────────────────
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
         st.markdown(f'<div class="scoreboard">💰 ACCOUNT<br>${st.session_state.account:,.2f}</div>', unsafe_allow_html=True)
@@ -243,11 +132,9 @@ def main():
             for i, pattern in enumerate(pattern_options):
                 with cols[i % 3]:
                     if st.button(pattern, key=f"pat_{pattern}"):
-                        # Simple submission handler
                         st.session_state.selected_pattern = pattern
                         st.rerun()
             
-            # Handle submission after rerun
             if 'selected_pattern' in st.session_state:
                 handle_submission(st.session_state.selected_pattern, remaining)
                 del st.session_state.selected_pattern
@@ -259,30 +146,72 @@ def main():
             if st.button("NEXT CHART"):
                 st.rerun()
 
-def handle_submission(selected_pattern, time_remaining):
-    correct = selected_pattern == st.session_state.correct_pattern
-    st.session_state.total_trades += 1
-    
-    if correct:
-        st.session_state.winning_trades += 1
-        st.session_state.streak += 1
-        
-        points = calculate_score(True, time_remaining, 1.5, True)
-        st.session_state.score += points
-        
-        profit = st.session_state.account * 0.02 * 2
-        st.session_state.account += profit
-        
-        st.success(f"✅ CORRECT! +${profit:,.2f} | +{points} pts | Streak: {st.session_state.streak}")
-    else:
-        st.session_state.streak = 0
-        loss = st.session_state.account * 0.02
-        st.session_state.account -= loss
-        st.error(f"❌ WRONG! -${loss:,.2f} | Pattern was: {st.session_state.correct_pattern}")
-    
-    st.session_state.game_active = False
-    time.sleep(2)
-    st.rerun()
+# ──────────────────────────────────────────────────────────────
+# PERFECT EXAMPLE GENERATORS (for cheat sheet)
+# ──────────────────────────────────────────────────────────────
 
-if __name__ == "__main__":
-    main()
+def create_perfect_hammer():
+    """Create textbook hammer example"""
+    df = pd.DataFrame({
+        'date': [datetime.now() - timedelta(minutes=i) for i in range(4, 0, -1)],
+        'open': [100, 100.5, 99.8, 100],
+        'high': [101, 101.2, 100.1, 100.3],
+        'low': [99.5, 99.8, 97.5, 99.9],
+        'close': [100.3, 100.8, 99.9, 100.2]
+    })
+    # Make candle #2 a perfect hammer
+    df.at[df.index[1], 'low'] = 97.0  # Long lower wick
+    df.at[df.index[1], 'open'] = 99.8
+    df.at[df.index[1], 'close'] = 100.0  # Small body
+    df.at[df.index[1], 'high'] = 100.2
+    return df
+
+def create_perfect_shooting_star():
+    df = pd.DataFrame({
+        'date': [datetime.now() - timedelta(minutes=i) for i in range(4, 0, -1)],
+        'open': [100, 100, 100.5, 100.2],
+        'high': [101, 103, 101.2, 100.8],
+        'low': [99.5, 99.8, 100.3, 100.0],
+        'close': [100.3, 100.1, 100.4, 100.3]
+    })
+    # Make candle #1 a perfect shooting star
+    df.at[df.index[1], 'high'] = 103.5  # Long upper wick
+    df.at[df.index[1], 'open'] = 100.0
+    df.at[df.index[1], 'close'] = 100.1  # Small body
+    df.at[df.index[1], 'low'] = 99.9
+    return df
+
+def create_perfect_doji():
+    df = pd.DataFrame({
+        'date': [datetime.now() - timedelta(minutes=i) for i in range(4, 0, -1)],
+        'open': [100, 100, 100.5, 100.2],
+        'high': [101, 101.5, 101.2, 100.8],
+        'low': [99.5, 98.5, 99.8, 100.0],
+        'close': [100.3, 100, 100.4, 100.3]
+    })
+    # Make candle #1 perfect doji
+    df.at[df.index[1], 'open'] = 100.0
+    df.at[df.index[1], 'close'] = 100.01  # Open ≈ Close
+    return df
+
+def create_perfect_engulfing(bias):
+    df = pd.DataFrame({
+        'date': [datetime.now() - timedelta(minutes=i) for i in range(5, 0, -1)],
+        'open': [100, 100.5, 100, 100.3, 100.1],
+        'high': [100.8, 101, 100.5, 101.5, 100.5],
+        'low': [99.5, 100.2, 99.8, 99.5, 99.9],
+        'close': [100.5, 100.7, 100.1, 101.2, 100.3]
+    })
+    
+    if bias == "bullish":
+        df.at[df.index[2], 'open'] = 100.5  # Small red candle
+        df.at[df.index[2], 'close'] = 100.2
+        df.at[df.index[1], 'open'] = 100.0  # Big green engulfs it
+        df.at[df.index[1], 'close'] = 100.8
+    else:
+        df.at[df.index[2], 'open'] = 99.8   # Small green candle
+        df.at[df.index[2], 'close'] = 100.3
+        df.at[df.index[1], 'open'] = 100.4  # Big red engulfs it
+        df.at[df.index[1], 'close'] = 99.7
+        
+    return df

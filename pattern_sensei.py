@@ -44,11 +44,11 @@ PATTERNS = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SINGLE PATTERN GENERATOR - IDENTICAL FOR CHEAT SHEET & TEST
+# SINGLE PATTERN GENERATOR
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_pattern(pattern_type):
-    """EXACT SAME LOGIC for cheat sheet and test - NO DISCREPANCIES"""
+    """EXACT SAME LOGIC for cheat sheet and test"""
     df = generate_base_candles(20)
     idx = -2  # Pattern is ALWAYS the 2nd to last candle
     
@@ -103,7 +103,6 @@ def generate_pattern(pattern_type):
     return df, pattern_type
 
 def generate_base_candles(n=20):
-    """Generate random OHLC data"""
     np.random.seed(int(time.time()) + random.randint(0, 1000))
     start_price = random.uniform(50, 150)
     volatility = random.uniform(0.01, 0.03)
@@ -119,7 +118,7 @@ def generate_base_candles(n=20):
     return df
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SESSION STATE - FIXED: ADDED time_limit
+# SESSION STATE - FIXED
 # ─────────────────────────────────────────────────────────────────────────────
 
 def initialize_session():
@@ -134,7 +133,7 @@ def initialize_session():
         st.session_state.correct_pattern = None
         st.session_state.start_time = None
         st.session_state.game_active = False
-        st.session_state.time_limit = 15  # WAS MISSING - NOW ADDED
+        st.session_state.time_limit = 15
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHART DRAWING
@@ -162,7 +161,6 @@ def draw_chart(df, is_cheat_sheet=False):
         template='plotly_dark', paper_bgcolor='#1a1a2e', plot_bgcolor='#16213e'
     )
     
-    # Yellow line at pattern candle
     pattern_date = df['date'].iloc[-2]
     fig.add_vline(x=pattern_date, line_width=3, line_color="yellow", opacity=0.7)
     
@@ -224,13 +222,10 @@ def main():
                 
                 st.markdown(f"<h4 style='color:{bias_color}'>{pattern_name.upper()}</h4>", unsafe_allow_html=True)
                 
-                # Generate using SAME function as test
                 df, _ = generate_pattern(pattern_name)
-                df = df.iloc[-5:]  # Show last 5 candles
-                
+                df = df.iloc[-5:]
                 fig = draw_chart(df, is_cheat_sheet=True)
                 
-                # Add pattern label
                 pattern_date = df['date'].iloc[-2]
                 fig.add_annotation(
                     x=pattern_date, y=df['high'].iloc[-2] + 1.5,
@@ -240,7 +235,6 @@ def main():
                 
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 
-                # Show OHLC values of pattern candle
                 pattern_candle = df.iloc[-2]
                 st.code(f"O: {pattern_candle['open']:.2f} | H: {pattern_candle['high']:.2f} | L: {pattern_candle['low']:.2f} | C: {pattern_candle['close']:.2f}")
                 
@@ -272,7 +266,7 @@ def main():
         elapsed = time.time() - st.session_state.start_time
         remaining = max(0, st.session_state.time_limit - elapsed)
         if remaining > 0:
-            st.markdown(f'<div class="timer'>{remaining:.1f}s</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="timer">{remaining:.1f}s</div>', unsafe_allow_html=True)  # FIXED LINE
             fig = draw_chart(st.session_state.current_chart)
             st.plotly_chart(fig, use_container_width=True, key="chart")
             st.markdown("### 🎯 SELECT PATTERN")

@@ -12,74 +12,79 @@ import random
 
 PATTERNS = {
     "Hammer": {
-        "desc": "Small body, long lower wick (2x+ body), bullish",
+        "desc": "Small body, LONG lower wick (3x+ body), little upper wick",
         "bias": "Bullish",
-        "stop_loss": "Below wick low",
+        "stop_loss": "Below wick low - 1% buffer",
         "generator": lambda: generate_hammer()
     },
     "Shooting Star": {
-        "desc": "Small body, long upper wick (2x+ body), bearish",
-        "bias": "Bearish", 
-        "stop_loss": "Above wick high",
+        "desc": "Small body, LONG upper wick (3x+ body), little lower wick", 
+        "bias": "Bearish",
+        "stop_loss": "Above wick high + 1% buffer",
         "generator": lambda: generate_shooting_star()
     },
     "Doji": {
-        "desc": "Open ≈ Close, indecision",
-        "bias": "Neutral",
-        "stop_loss": "Beyond wicks",
+        "desc": "Open ≈ Close (within 0.5%), long wicks both sides",
+        "bias": "Neutral/Indecision",
+        "stop_loss": "Beyond extremes",
         "generator": lambda: generate_doji()
     },
     "Bullish Engulfing": {
-        "desc": "Small red candle fully covered by large green candle",
+        "desc": "Small RED candle fully covered by larger GREEN candle",
         "bias": "Bullish",
-        "stop_loss": "Below green candle low",
+        "stop_loss": "Below engulfing candle low",
         "generator": lambda: generate_engulfing("bullish")
     },
     "Bearish Engulfing": {
-        "desc": "Small green candle fully covered by large red candle", 
+        "desc": "Small GREEN candle fully covered by larger RED candle",
         "bias": "Bearish",
-        "stop_loss": "Above red candle high",
+        "stop_loss": "Above engulfing candle high",
         "generator": lambda: generate_engulfing("bearish")
     }
 }
 
 @st.cache_data
 def create_perfect_examples():
-    """Generate perfect pattern examples ONCE and cache them"""
+    """Generate textbook-perfect examples - EXAGGERATED for learning"""
     examples = {}
     now = datetime.now()
     
-    dates = [now - timedelta(minutes=4), now - timedelta(minutes=3), 
-             now - timedelta(minutes=2), now - timedelta(minutes=1)]
+    dates = [now - timedelta(minutes=2), now - timedelta(minutes=1), now]
     
+    # HAMMER: Clear bullish
     examples['Hammer'] = pd.DataFrame({
-        'date': dates, 'open': [100, 100, 99.8, 100], 'high': [101, 101, 100.1, 100.3],
-        'low': [99.5, 96.0, 99.9, 99.9], 'close': [100.3, 100.8, 99.9, 100.2]
+        'date': dates, 'open': [100.0, 100.5, 100.8], 'high': [100.5, 100.6, 101.0],
+        'low': [99.5, 96.0, 100.2], 'close': [100.2, 100.4, 100.9]
     })
     
+    # SHOOTING STAR: Clear bearish
     examples['Shooting Star'] = pd.DataFrame({
-        'date': dates, 'open': [100, 100, 100.5, 100.2], 'high': [101, 104.5, 101.2, 100.8],
-        'low': [99.5, 99.8, 100.3, 100.0], 'close': [100.3, 100.1, 100.4, 100.3]
+        'date': dates, 'open': [102.0, 102.2, 101.5], 'high': [102.5, 106.5, 101.8],
+        'low': [101.8, 102.0, 101.2], 'close': [102.3, 102.1, 101.3]
     })
     
+    # DOJI: Perfect cross
     examples['Doji'] = pd.DataFrame({
-        'date': dates, 'open': [100, 100, 100.5, 100.2], 'high': [101, 101.5, 101.2, 100.8],
-        'low': [99.5, 98.5, 99.8, 100.0], 'close': [100.3, 100.01, 100.4, 100.3]
+        'date': dates, 'open': [100.5, 100.5, 100.4], 'high': [101.5, 102.0, 100.8],
+        'low': [99.5, 99.0, 100.0], 'close': [100.3, 100.5, 100.6]
     })
     
+    # BULLISH ENGULFING
     examples['Bullish Engulfing'] = pd.DataFrame({
-        'date': dates, 'open': [100, 100.5, 100.5, 99.5], 'high': [100.8, 101, 100.6, 101.5],
-        'low': [99.5, 100.2, 100.2, 99.0], 'close': [100.5, 100.2, 100.2, 101.2]
+        'date': dates, 'open': [99.0, 100.2, 99.8], 'high': [100.0, 100.3, 101.5],
+        'low': [98.5, 99.8, 99.5], 'close': [100.1, 99.9, 101.2]
     })
     
+    # BEARISH ENGULFING
     examples['Bearish Engulfing'] = pd.DataFrame({
-        'date': dates, 'open': [100, 99.5, 99.8, 100.4], 'high': [100.8, 100, 100.5, 100.5],
-        'low': [99.5, 99.0, 99.5, 99.2], 'close': [100.5, 100.4, 100.4, 99.5]
+        'date': dates, 'open': [101.0, 100.8, 101.2], 'high': [101.5, 101.0, 101.5],
+        'low': [100.5, 100.5, 99.5], 'close': [100.9, 101.0, 99.8]
     })
     
     return examples
 
 def generate_base_candles(n=20):
+    """Generate realistic OHLCV data"""
     np.random.seed(int(time.time()) + random.randint(0, 1000))
     start_price = random.uniform(50, 150)
     volatility = random.uniform(0.01, 0.03)
@@ -95,47 +100,82 @@ def generate_base_candles(n=20):
     return df
 
 def generate_hammer():
+    """EXAGGERATED hammer - unmistakable"""
     df = generate_base_candles()
-    idx = -3
-    body = abs(df.iloc[idx]['open'] - df.iloc[idx]['close'])
-    wick_size = body * random.uniform(2.5, 4)
-    df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - wick_size
-    df.at[df.index[idx], 'high'] = max(df.iloc[idx]['open'], df.iloc[idx]['close']) + body*0.3
+    idx = -2  # Pattern at center position
+    
+    base_price = df.iloc[idx]['open']
+    body_size = 0.2  # Tiny body
+    wick_size = body_size * random.uniform(5.0, 7.0)  # VERY long wick
+    
+    df.at[df.index[idx], 'open'] = base_price
+    df.at[df.index[idx], 'close'] = base_price + body_size  # Small green body
+    df.at[df.index[idx], 'low'] = base_price - wick_size  # Dramatic lower wick
+    df.at[df.index[idx], 'high'] = base_price + (body_size * 0.3)  # Minimal upper wick
+    
     return df, "Hammer"
 
 def generate_shooting_star():
+    """EXAGGERATED shooting star - unmistakable"""
     df = generate_base_candles()
-    idx = -3
-    body = abs(df.iloc[idx]['open'] - df.iloc[idx]['close'])
-    wick_size = body * random.uniform(2.5, 4)
-    df.at[df.index[idx], 'high'] = max(df.iloc[idx]['open'], df.iloc[idx]['close']) + wick_size
-    df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - body*0.3
+    idx = -2
+    
+    base_price = df.iloc[idx]['open']
+    body_size = 0.2
+    wick_size = body_size * random.uniform(5.0, 7.0)
+    
+    df.at[df.index[idx], 'open'] = base_price + body_size
+    df.at[df.index[idx], 'close'] = base_price  # Small red body
+    df.at[df.index[idx], 'high'] = base_price + wick_size  # Dramatic upper wick
+    df.at[df.index[idx], 'low'] = base_price - (body_size * 0.3)  # Minimal lower wick
+    
     return df, "Shooting Star"
 
 def generate_doji():
+    """EXAGGERATED doji - perfect cross"""
     df = generate_base_candles()
-    idx = -3
-    body_range = df.iloc[idx]['open'] * 0.002
-    df.at[df.index[idx], 'close'] = df.iloc[idx]['open'] + random.uniform(-body_range, body_range)
-    df.at[df.index[idx], 'high'] = df.iloc[idx]['open'] + df.iloc[idx]['open']*0.01
-    df.at[df.index[idx], 'low'] = df.iloc[idx]['open'] - df.iloc[idx]['open']*0.01
+    idx = -2
+    
+    base_price = df.iloc[idx]['open']
+    df.at[df.index[idx], 'open'] = base_price
+    df.at[df.index[idx], 'close'] = base_price + random.uniform(-0.03, 0.03)  # Open ≈ Close
+    df.at[df.index[idx], 'high'] = base_price + 1.8  # Long upper wick
+    df.at[df.index[idx], 'low'] = base_price - 1.8   # Long lower wick
+    
     return df, "Doji"
 
 def generate_engulfing(bias):
+    """EXAGGERATED engulfing - tiny candle vs huge candle"""
     df = generate_base_candles()
-    idx = -3
+    idx = -2
+    
+    base_price = df.iloc[idx-1]['open']
     
     if bias == "bullish":
-        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] - 0.5
-        df.at[df.index[idx], 'open'] = df.iloc[idx-1]['close'] - 0.3
-        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] + 1.5
-    else:
-        df.at[df.index[idx-1], 'close'] = df.iloc[idx-1]['open'] + 0.5
-        df.at[df.index[idx], 'open'] = df.iloc[idx-1]['close'] + 0.3
-        df.at[df.index[idx], 'close'] = df.iloc[idx-1]['open'] - 1.5
+        # Small red candle
+        df.at[df.index[idx-1], 'open'] = base_price + 0.3
+        df.at[df.index[idx-1], 'close'] = base_price - 0.3
+        df.at[df.index[idx-1], 'high'] = base_price + 0.4
+        df.at[df.index[idx-1], 'low'] = base_price - 0.4
         
-    df.at[df.index[idx], 'high'] = max(df.iloc[idx]['open'], df.iloc[idx]['close']) + 0.2
-    df.at[df.index[idx], 'low'] = min(df.iloc[idx]['open'], df.iloc[idx]['close']) - 0.2
+        # Massive green candle that engulfs
+        df.at[df.index[idx], 'open'] = base_price - 0.5
+        df.at[df.index[idx], 'close'] = base_price + 1.2
+        df.at[df.index[idx], 'high'] = base_price + 1.5
+        df.at[df.index[idx], 'low'] = base_price - 0.6
+        
+    else:
+        # Small green candle
+        df.at[df.index[idx-1], 'open'] = base_price - 0.3
+        df.at[df.index[idx-1], 'close'] = base_price + 0.3
+        df.at[df.index[idx-1], 'high'] = base_price + 0.4
+        df.at[df.index[idx-1], 'low'] = base_price - 0.4
+        
+        # Massive red candle that engulfs
+        df.at[df.index[idx], 'open'] = base_price + 0.5
+        df.at[df.index[idx], 'close'] = base_price - 1.2
+        df.at[df.index[idx], 'high'] = base_price + 0.6
+        df.at[df.index[idx], 'low'] = base_price - 1.5
     
     pattern = "Bullish Engulfing" if bias == "bullish" else "Bearish Engulfing"
     return df, pattern
@@ -162,17 +202,19 @@ def draw_chart(df):
     ))
     
     fig.update_layout(
-        title="CHART ACTION - IDENTIFY THE PATTERN",
+        title="CHART ACTION - IDENTIFY THE PATTERN (Focus on highlighted candle)",
         title_font_color="#ff6b6b", title_font_size=24,
         xaxis_rangeslider_visible=False, template='plotly_dark', height=500,
-        margin=dict(l=20, r=20, t=60, b=20), paper_bgcolor='#1a1a2e', plot_bgcolor='#16213e'
+        margin=dict(l=20, r=20, t=80, b=20), paper_bgcolor='#1a1a2e', plot_bgcolor='#16213e'
     )
     
-    last_date = df['date'].iloc[-3]
+    # Highlight the pattern candle (center of focus zone)
+    pattern_date = df['date'].iloc[-2]
     fig.add_vrect(
-        x0=last_date, x1=df['date'].iloc[-1],
-        fillcolor="rgba(255,107,107,0.1)", layer="below", line_width=0,
-        annotation_text="FOCUS ZONE", annotation_position="top left"
+        x0=pattern_date, x1=pattern_date,
+        fillcolor="rgba(255,255,0,0.25)", layer="below", line_width=3,
+        line_color="yellow", annotation_text="PATTERN CANDLE", 
+        annotation_position="top"
     )
     
     return fig
@@ -222,23 +264,46 @@ def main():
         st.markdown("## 📖 PATTERN CHEAT SHEET")
         examples = create_perfect_examples()
         with st.expander("CLICK TO EXPAND", expanded=False):
-            st.warning("⚠️ **Using cheat sheet reduces next score by 30%**")
+            st.warning("⚠️ Using cheat sheet = -30% score penalty")
+            
             for pattern_name in PATTERNS.keys():
                 st.markdown("---")
-                st.markdown(f"#### **{pattern_name.upper()}**")
+                
+                bias_color = "#26d367" if PATTERNS[pattern_name]['bias'] == "Bullish" else "#ff4757"
+                if PATTERNS[pattern_name]['bias'] == "Neutral":
+                    bias_color = "#feca57"
+                
+                st.markdown(f"<h4 style='color:{bias_color}'>{pattern_name.upper()}</h4>", unsafe_allow_html=True)
                 
                 fig = go.Figure(data=go.Candlestick(
-                    x=examples[pattern_name]['date'], open=examples[pattern_name]['open'], high=examples[pattern_name]['high'],
-                    low=examples[pattern_name]['low'], close=examples[pattern_name]['close'],
+                    x=examples[pattern_name]['date'],
+                    open=examples[pattern_name]['open'],
+                    high=examples[pattern_name]['high'],
+                    low=examples[pattern_name]['low'],
+                    close=examples[pattern_name]['close'],
                     increasing_line_color='#26d367', decreasing_line_color='#ff4757'
                 ))
-                fig.update_layout(height=120, margin=dict(l=10, r=10, t=10, b=10), xaxis_visible=False, yaxis_visible=False,
+                
+                pattern_date = examples[pattern_name]['date'].iloc[1]
+                fig.add_vrect(
+                    x0=pattern_date, x1=pattern_date,
+                    fillcolor="rgba(255,255,0,0.3)", line_width=3, line_color="yellow"
+                )
+                
+                fig.add_annotation(
+                    x=pattern_date, y=examples[pattern_name]['high'].iloc[1] + 0.8,
+                    text="PATTERN", showarrow=True, arrowhead=2, arrowcolor="yellow",
+                    font=dict(color="yellow", size=14)
+                )
+                
+                fig.update_layout(height=120, margin=dict(l=10, r=10, t=10, b=10), 
+                                 xaxis_visible=False, yaxis_visible=False,
                                  template='plotly_dark', paper_bgcolor='#1a1a2e', plot_bgcolor='#16213e')
+                
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 
-                # SAFE single-line markdowns (no triple quotes)
                 st.markdown(f"**Visual:** {PATTERNS[pattern_name]['desc']}")
-                st.markdown(f"**Bias:** {PATTERNS[pattern_name]['bias']}")
+                st.markdown(f"**Bias:** <span style='color:{bias_color}'>{PATTERNS[pattern_name]['bias']}</span>", unsafe_allow_html=True)
                 st.markdown(f"**Stop:** {PATTERNS[pattern_name]['stop_loss']}")
     
     # MAIN GAME

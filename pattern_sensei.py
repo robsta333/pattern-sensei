@@ -7,7 +7,7 @@ import time
 import random
 
 # ─────────────────────────────────────────────────────────────────────────────
-# PATTERN DEFINITIONS - CORRECT & UNAMBIGUOUS
+# PATTERN DEFINITIONS & GENERATION
 # ─────────────────────────────────────────────────────────────────────────────
 
 PATTERNS = {
@@ -25,7 +25,7 @@ PATTERNS = {
     },
     "Doji": {
         "desc": "Open ≈ Close (virtually same price), long wicks BOTH directions",
-        "bias": "Neutral/Indecision",
+        "bias": "Neutral",
         "stop_loss": "Beyond both wicks",
         "generator": lambda: generate_pattern("Doji")
     },
@@ -44,60 +44,57 @@ PATTERNS = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SINGLE PATTERN GENERATOR FOR BOTH CHEAT SHEET & TEST
+# SINGLE PATTERN GENERATOR - IDENTICAL FOR CHEAT SHEET & TEST
 # ─────────────────────────────────────────────────────────────────────────────
 
 def generate_pattern(pattern_type):
-    """EXACT SAME LOGIC for cheat sheet and test - no inconsistencies"""
+    """EXACT SAME LOGIC for cheat sheet and test - NO DISCREPANCIES"""
     df = generate_base_candles(20)
-    idx = -2  # Pattern is ALWAYS the 2nd to last candle (center of focus)
+    idx = -2  # Pattern is ALWAYS the 2nd to last candle
     
     base_price = df.iloc[idx]['open']
     
     if pattern_type == "Hammer":
-        # Hammer: green body at top, huge lower wick
         body_size = 0.2
         df.at[df.index[idx], 'open'] = base_price
-        df.at[df.index[idx], 'close'] = base_price + body_size
+        df.at[df.index[idx], 'close'] = base_price + body_size  # Green body
         df.at[df.index[idx], 'low'] = base_price - (body_size * 6)  # Huge lower wick
         df.at[df.index[idx], 'high'] = base_price + (body_size * 0.2)  # Tiny upper wick
     
     elif pattern_type == "Shooting Star":
-        # Shooting star: red body at bottom, huge upper wick
         body_size = 0.2
         df.at[df.index[idx], 'open'] = base_price + body_size
-        df.at[df.index[idx], 'close'] = base_price
+        df.at[df.index[idx], 'close'] = base_price  # Red body
         df.at[df.index[idx], 'high'] = base_price + (body_size * 6)  # Huge upper wick
         df.at[df.index[idx], 'low'] = base_price - (body_size * 0.2)  # Tiny lower wick
     
     elif pattern_type == "Doji":
-        # Doji: open = close, long wicks both sides
         df.at[df.index[idx], 'open'] = base_price
         df.at[df.index[idx], 'close'] = base_price + random.uniform(-0.05, 0.05)
         df.at[df.index[idx], 'high'] = base_price + 2.0
         df.at[df.index[idx], 'low'] = base_price - 2.0
     
     elif pattern_type == "Bullish Engulfing":
-        # Previous candle: small red
+        # Previous: small red
         df.at[df.index[idx-1], 'open'] = base_price + 0.3
         df.at[df.index[idx-1], 'close'] = base_price - 0.3
         df.at[df.index[idx-1], 'high'] = base_price + 0.4
         df.at[df.index[idx-1], 'low'] = base_price - 0.4
         
-        # Current candle: big green that engulfs
+        # Current: big green engulfing
         df.at[df.index[idx], 'open'] = base_price - 0.5
         df.at[df.index[idx], 'close'] = base_price + 1.0
         df.at[df.index[idx], 'high'] = base_price + 1.2
         df.at[df.index[idx], 'low'] = base_price - 0.6
     
     elif pattern_type == "Bearish Engulfing":
-        # Previous candle: small green
+        # Previous: small green
         df.at[df.index[idx-1], 'open'] = base_price - 0.3
         df.at[df.index[idx-1], 'close'] = base_price + 0.3
         df.at[df.index[idx-1], 'high'] = base_price + 0.4
         df.at[df.index[idx-1], 'low'] = base_price - 0.4
         
-        # Current candle: big red that engulfs
+        # Current: big red engulfing
         df.at[df.index[idx], 'open'] = base_price + 0.5
         df.at[df.index[idx], 'close'] = base_price - 1.0
         df.at[df.index[idx], 'high'] = base_price + 0.6
@@ -122,7 +119,7 @@ def generate_base_candles(n=20):
     return df
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SESSION STATE
+# SESSION STATE - FIXED: ADDED time_limit
 # ─────────────────────────────────────────────────────────────────────────────
 
 def initialize_session():
@@ -137,6 +134,7 @@ def initialize_session():
         st.session_state.correct_pattern = None
         st.session_state.start_time = None
         st.session_state.game_active = False
+        st.session_state.time_limit = 15  # WAS MISSING - NOW ADDED
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CHART DRAWING
@@ -207,6 +205,7 @@ def handle_submission(selected_pattern, time_remaining):
 
 def main():
     st.set_page_config(page_title="Pattern Sensei", layout="wide")
+    
     st.markdown("""<style>@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@700&display=swap');body{background-color:#1a1a2e;color:white;}.stButton>button{font-size:20px;font-weight:bold;background:linear-gradient(90deg,#ff6b6b 0%,#feca57 100%);color:black;border-radius:10px;padding:15px 30px;font-family:'Orbitron',sans-serif;}.scoreboard{font-family:'Orbitron',sans-serif;font-size:28px;color:#feca57;text-align:center;padding:20px;background:rgba(255,255,255,0.1);border-radius:15px;}.timer{font-size:48px;color:#ff6b6b;font-weight:bold;text-align:center;}</style>""", unsafe_allow_html=True)
     
     initialize_session()
@@ -215,7 +214,7 @@ def main():
     with st.sidebar:
         st.markdown("## 📖 PATTERN CHEAT SHEET")
         
-        with st.expander("CLICK TO VIEW PERFECT EXAMPLES", expanded=False):
+        with st.expander("CLICK TO VIEW PERFECT EXAMPLES (Same as Test!)", expanded=False):
             for pattern_name in PATTERNS.keys():
                 st.divider()
                 
@@ -229,22 +228,20 @@ def main():
                 df, _ = generate_pattern(pattern_name)
                 df = df.iloc[-5:]  # Show last 5 candles
                 
-                # Draw mini chart
                 fig = draw_chart(df, is_cheat_sheet=True)
                 
                 # Add pattern label
                 pattern_date = df['date'].iloc[-2]
                 fig.add_annotation(
-                    x=pattern_date, y=df['high'].iloc[-2] + 1,
+                    x=pattern_date, y=df['high'].iloc[-2] + 1.5,
                     text="PATTERN", showarrow=True, arrowhead=2, arrowcolor="yellow",
                     font=dict(color="yellow", size=14)
                 )
                 
                 st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
                 
-                # Show OHLC values of pattern candle for absolute clarity
+                # Show OHLC values of pattern candle
                 pattern_candle = df.iloc[-2]
-                st.markdown(f"**Pattern Candle OHLC:**")
                 st.code(f"O: {pattern_candle['open']:.2f} | H: {pattern_candle['high']:.2f} | L: {pattern_candle['low']:.2f} | C: {pattern_candle['close']:.2f}")
                 
                 st.markdown(f"**Visual:** {PATTERNS[pattern_name]['desc']}")
@@ -265,7 +262,7 @@ def main():
     if not st.session_state.game_active:
         if st.button("🎯 START TRADE", key="start", use_container_width=True):
             pattern_name = random.choice(list(PATTERNS.keys()))
-            df, pattern = generate_pattern(pattern_name)  # Use same generator
+            df, pattern = generate_pattern(pattern_name)
             st.session_state.current_chart = df
             st.session_state.correct_pattern = pattern
             st.session_state.start_time = time.time()
@@ -275,7 +272,7 @@ def main():
         elapsed = time.time() - st.session_state.start_time
         remaining = max(0, st.session_state.time_limit - elapsed)
         if remaining > 0:
-            st.markdown(f'<div class="timer">{remaining:.1f}s</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="timer'>{remaining:.1f}s</div>', unsafe_allow_html=True)
             fig = draw_chart(st.session_state.current_chart)
             st.plotly_chart(fig, use_container_width=True, key="chart")
             st.markdown("### 🎯 SELECT PATTERN")
